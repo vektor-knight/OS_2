@@ -21,7 +21,15 @@
 #include "kernel/Output.h"
 #include "world/Access.h"
 #include "machine/Machine.h"
-#include "devices/Keyboard.h"	   
+#include "devices/Keyboard.h"
+
+int schedMinGranularity;
+int defaultEpochLength;
+int currentEpochLength;
+
+mword schedMinGranularityTicks;
+mword defaultEpochLengthTicks;
+mword currentEpochLengthTicks;
 	   
 /***********************************
     Used as a node in the tree to 

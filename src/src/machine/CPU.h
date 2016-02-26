@@ -94,6 +94,8 @@ namespace MSR {
 };
 
 namespace CPU {
+//  static mword cpuSpeed;
+
   static inline void out8( uint16_t port, uint8_t val ) {
     asm volatile("outb %0, %1" :: "a"(val), "Nd"(port));
   }

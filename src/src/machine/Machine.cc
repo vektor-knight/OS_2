@@ -41,6 +41,7 @@
 #include <list>
 #include <map>
 
+
 // simple direct declarations in lieu of more header files
 extern void initCdiDrivers();
 extern bool findCdiDriver(const PCIDevice&);

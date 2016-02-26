@@ -48,6 +48,16 @@ class Scheduler {
   const Scheduler& operator=(const Scheduler&) = delete; // no assignment
 
 public:
+// AFS parameters, stored as static variables. As we have 
+// noted in Kernel.cc, we could not pass the schedparam
+// values to schedMinGranularity and defaultEpochLength.
+  static int schedMinGranularity;
+  static int defaultEpochLength;
+  static int currentEpochLength;
+
+  static mword schedMinGranularityTicks;
+  static mword defaultEpochLengthTicks;
+  static mword currentEpochLengthTicks;
   Scheduler();
   
   bool switchTest(Thread* t);

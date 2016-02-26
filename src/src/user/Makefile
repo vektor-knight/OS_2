@@ -11,7 +11,7 @@ SRC=$(wildcard *.cc)
 OBJ=$(SRC:%.cc=%.o)
 EXE=$(SRC:%.cc=exec/%)
 
-all: $(EXE) exec/motb exec/schedparam 
+all: $(EXE) exec/schedparam 
 
 .PHONY: .FORCE
 
@@ -24,21 +24,11 @@ $(EXE): exec/%: %.o ../ulib/libKOS.a
 	$(CXX) -L../ulib -o $@ $<
 #	strip $@
 
-exec/motb: .FORCE
-	@echo creating $@
-	@mkdir -p exec
-	@echo > $@
-	@echo "Hello everybody! So glad to see you..." >> $@
-	@echo >> $@
-	@echo -n "Build Date: " >> $@
-	@date >> $@
-	@echo >> $@
-
 exec/schedparam: .FORCE
 	@echo creating $@
 	@mkdir -p exec
-	@echo "schedMinGranularity = 20" >> $@
-	@echo "defaultEpochLength = 4" >> $@
+	@echo "20" >> $@
+	@echo -n "4" >> $@
 
 echo:
 	@echo SRC: $(SRC)
