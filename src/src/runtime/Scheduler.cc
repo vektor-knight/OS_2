@@ -19,38 +19,137 @@
 #include "runtime/Stack.h"
 #include "runtime/Thread.h"
 #include "kernel/Output.h"
-
+#include "world/Access.h"
+#include "machine/Machine.h"
+#include "devices/Keyboard.h"	   
+	   
+/***********************************
+    Used as a node in the tree to 
+	reference the thread instance
+	Created by: Adam Fazekas (Fall 2015)
+***********************************/
+class ThreadNode{
+	friend class Scheduler;
+	Thread *th;
+	
+	public:
+		bool operator < (ThreadNode other) const {
+			return th->priority < other.th->priority;
+		}
+		bool operator == (ThreadNode other) const {
+			return th->priority == other.th->priority;
+		}
+		bool operator > (ThreadNode other) const {
+			return th->priority > other.th->priority;
+		}
+    
+	//this is how we want to do it
+	ThreadNode(Thread *t){
+		th = t;
+	}
+};	   
+	   
+/***********************************
+			Constructor
+***********************************/	   
 Scheduler::Scheduler() : readyCount(0), preemption(0), resumption(0), partner(this) {
-  Thread* idleThread = Thread::create((vaddr)idleStack, minimumStack);
-  idleThread->setAffinity(this)->setPriority(idlePriority);
-  // use low-level routines, since runtime context might not exist
-  idleThread->stackPointer = stackInit(idleThread->stackPointer, &Runtime::getDefaultMemoryContext(), (ptr_t)Runtime::idleLoop, this, nullptr, nullptr);
-  readyQueue[idlePriority].push_back(*idleThread);
-  readyCount += 1;
+	//Initialize the idle thread
+	//(It keeps the CPU awake when there are no other threads currently running)
+	Thread* idleThread = Thread::create((vaddr)idleStack, minimumStack);
+	idleThread->setAffinity(this)->setPriority(idlePriority);
+	// use low-level routines, since runtime context might not exist
+	idleThread->stackPointer = stackInit(idleThread->stackPointer, &Runtime::getDefaultMemoryContext(), (ptr_t)Runtime::idleLoop, this, nullptr, nullptr);
+	
+	//Initialize the tree that contains the threads waiting to be served
+	readyTree = new Tree<ThreadNode>();
+	
+	//Add the idle thread to the tree
+	readyTree->insert(*(new ThreadNode(idleThread)));
+	readyCount += 1;
 }
 
+/***********************************
+		Static functions
+***********************************/      
 static inline void unlock() {}
 
 template<typename... Args>
 static inline void unlock(BasicLock &l, Args&... a) {
   l.release();
   unlock(a...);
+}	   
+
+/***********************************
+    Gets called whenever a thread 
+	should be added to the tree
+***********************************/
+void Scheduler::enqueue(Thread& t) {
+  GENASSERT1(t.priority < maxPriority, t.priority);
+  readyLock.acquire();
+  readyTree->insert(*(new ThreadNode(&t)));	
+  bool wake = (readyCount == 0);
+  readyCount += 1;						
+  readyLock.release();
+  Runtime::debugS("Thread ", FmtHex(&t), " queued on ", FmtHex(this));
+  if (wake) Runtime::wakeUp(this);
 }
 
-// very simple N-class prio scheduling!
+/***********************************
+    Gets triggered at every RTC
+	interrupt (per Scheduler)
+***********************************/
+void Scheduler::preempt(){		// IRQs disabled, lock count inflated
+	//Get current running thread
+	Thread* currentThread = Runtime::getCurrThread();
+
+	//Get its target scheduler
+	Scheduler* target = currentThread->getAffinity();						
+	
+	//Check if the thread should move to a new scheduler
+	//(based on the affinity)
+	if(target != this && target){						
+		//Switch the served thread on the target scheduler
+		switchThread(target);				
+	}
+	
+	//Check if it is time to switch the thread on the current scheduler
+	if(switchTest(currentThread)){
+		//Switch the served thread on the current scheduler
+		switchThread(this);	
+	}
+}
+
+/***********************************
+    Checks if it is time to stop
+	serving the current thread
+	and start serving the next
+	one
+***********************************/
+bool Scheduler::switchTest(Thread* t){
+	t->vRuntime++;
+	if (t->vRuntime % 10 == 0)
+		return true;
+	return false;															//Otherwise return that the thread should not be switched
+}
+
+/***********************************
+    Switches the current running
+	thread with the next thread
+	waiting in the tree
+***********************************/
 template<typename... Args>
 inline void Scheduler::switchThread(Scheduler* target, Args&... a) {
   preemption += 1;
   CHECK_LOCK_MIN(sizeof...(Args));
   Thread* nextThread;
   readyLock.acquire();
-  for (mword i = 0; i < (target ? idlePriority : maxPriority); i += 1) {
-    if (!readyQueue[i].empty()) {
-      nextThread = readyQueue[i].pop_front();
+	
+  if(!readyTree->empty()){
+	  nextThread = readyTree->popMinNode()->th;	
       readyCount -= 1;
-      goto threadFound;
-    }
-  }
+ 	  goto threadFound;
+	}
+
   readyLock.release();
   GENASSERT0(target);
   GENASSERT0(!sizeof...(Args));
@@ -82,6 +181,45 @@ threadFound:
   }
 }
 
+/***********************************
+    Gets triggered when a thread is 
+	suspended
+***********************************/
+void Scheduler::suspend(BasicLock& lk) {
+  Runtime::FakeLock fl;
+  switchThread(nullptr, lk);
+}
+void Scheduler::suspend(BasicLock& lk1, BasicLock& lk2) {
+  Runtime::FakeLock fl;
+  switchThread(nullptr, lk1, lk2);
+}
+
+/***********************************
+    Gets triggered when a thread is 
+	awake after suspension
+***********************************/
+void Scheduler::resume(Thread& t) {
+  GENASSERT1(&t != Runtime::getCurrThread(), Runtime::getCurrThread());
+  if (t.nextScheduler) t.nextScheduler->enqueue(t);
+  else Runtime::getScheduler()->enqueue(t);
+}
+
+/***********************************
+    Gets triggered when a thread is 
+	done but not destroyed yet
+***********************************/
+void Scheduler::terminate() {
+  Runtime::RealLock rl;
+  Thread* thr = Runtime::getCurrThread();
+  GENASSERT1(thr->state != Thread::Blocked, thr->state);
+  thr->state = Thread::Finishing;
+  switchThread(nullptr);
+  unreachable();
+}
+
+/***********************************
+		Other functions
+***********************************/      
 extern "C" Thread* postSwitch(Thread* prevThread, Scheduler* target) {
   CHECK_LOCK_COUNT(1);
   if fastpath(target) Scheduler::resume(*prevThread);
@@ -92,54 +230,4 @@ extern "C" void invokeThread(Thread* prevThread, Runtime::MemoryContext* ctx, fu
   Runtime::postResume(true, *prevThread, *ctx);
   func(arg1, arg2, arg3);
   Runtime::getScheduler()->terminate();
-}
-
-void Scheduler::enqueue(Thread& t) {
-  GENASSERT1(t.priority < maxPriority, t.priority);
-  readyLock.acquire();
-  readyQueue[t.priority].push_back(t);
-  bool wake = (readyCount == 0);
-  readyCount += 1;
-  readyLock.release();
-  Runtime::debugS("Thread ", FmtHex(&t), " queued on ", FmtHex(this));
-  if (wake) Runtime::wakeUp(this);
-}
-
-void Scheduler::resume(Thread& t) {
-  GENASSERT1(&t != Runtime::getCurrThread(), Runtime::getCurrThread());
-  if (t.nextScheduler) t.nextScheduler->enqueue(t);
-  else Runtime::getScheduler()->enqueue(t);
-}
-
-void Scheduler::preempt() {               // IRQs disabled, lock count inflated
-#if TESTING_NEVER_MIGRATE
-  switchThread(this);
-#else /* migration enabled */
-  Scheduler* target = Runtime::getCurrThread()->getAffinity();
-#if TESTING_ALWAYS_MIGRATE
-  if (!target) target = partner;
-#else /* simple load balancing */
-  if (!target) target = (partner->readyCount + 2 < readyCount) ? partner : this;
-#endif
-  switchThread(target);
-#endif
-}
-
-void Scheduler::suspend(BasicLock& lk) {
-  Runtime::FakeLock fl;
-  switchThread(nullptr, lk);
-}
-
-void Scheduler::suspend(BasicLock& lk1, BasicLock& lk2) {
-  Runtime::FakeLock fl;
-  switchThread(nullptr, lk1, lk2);
-}
-
-void Scheduler::terminate() {
-  Runtime::RealLock rl;
-  Thread* thr = Runtime::getCurrThread();
-  GENASSERT1(thr->state != Thread::Blocked, thr->state);
-  thr->state = Thread::Finishing;
-  switchThread(nullptr);
-  unreachable();
 }
