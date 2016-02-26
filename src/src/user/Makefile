@@ -37,11 +37,8 @@ exec/motb: .FORCE
 exec/schedparam: .FORCE
 	@echo creating $@
 	@mkdir -p exec
-	@echo > $@
 	@echo "schedMinGranularity = 20" >> $@
-	@echo >> $@
 	@echo "defaultEpochLength = 4" >> $@
-	@echo >>$@
 
 echo:
 	@echo SRC: $(SRC)
