@@ -39,6 +39,7 @@ static void keybLoop() {
 #endif
 
 void kosMain() {
+  /*
   KOUT::outl("Welcome to KOS!", kendl);
   auto iter = kernelFS.find("motb");
   if (iter == kernelFS.end()) {
@@ -52,6 +53,14 @@ void kosMain() {
     }
     KOUT::outl();
   }
+  */
+
+//  mword newRTC = 32768 >> (0x03 - 1);
+//  KOUT::outl("Setting RTC frequency to highest value: ", newRTC);
+//  KOUT::outl(newRTC);
+}
+
+/*
 #if TESTING_TIMER_TEST
   StdErr.print(" timer test, 3 secs...");
   for (int i = 0; i < 3; i++) {
@@ -72,7 +81,9 @@ void kosMain() {
     KOUT::outl("...ping...");
   }
 #endif
-}
+*/
+
+
 
 extern "C" void kmain(mword magic, mword addr, mword idx)         __section(".boot.text");
 extern "C" void kmain(mword magic, mword addr, mword idx) {

@@ -17,8 +17,17 @@
 #include "machine/APIC.h"
 #include "machine/Machine.h"
 #include "devices/RTC.h"
+#include "kernel/Output.h"
 
 void RTC::init() { // see http://wiki.osdev.org/RTC
+  // done. use the documentation to support claims here.
+  mword RTC_rate = PIC::RTC;
+  if (RTC_rate>15) RTC_rate = 15;
+
+  RTC_rate= 32768 >>(0x04-1);
+  KOUT::outl("\nRTC is being set to: ", RTC_rate, " \n");
+//  int newFreq = 32768 >> (PIC::RTC - 1);
+//  KOUT::outl("RTC rate is ", newFreq);
   Machine::registerIrqSync(PIC::RTC, 0xf8);
 
   CPU::out8(0x70, CPU::in8(0x70) | 0x80); // disable NMI
