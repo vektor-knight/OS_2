@@ -23,13 +23,27 @@
 #include "machine/Machine.h"
 #include "devices/Keyboard.h"
 
-int schedMinGranularity;
-int defaultEpochLength;
-int currentEpochLength;
+// Needed for recalibrating scheduler parameters
+// in terms of ticks per second.
+mword totalPrio = 0;
+mword taskTimeslice = 1;
+// Task running times
+mword timeStart;
+mword timeWait;
 
-mword schedMinGranularityTicks;
-mword defaultEpochLengthTicks;
-mword currentEpochLengthTicks;
+// Since we could not parse the 
+// schedparams, the default values
+// for granularity and epoch length
+// are defined here.
+int schedMinGranularity = 20;
+int defaultEpochLength = 4;
+
+// We do the calculations here as well, although
+// in terms of design we should have done this 
+// in Kernel.cc ("at the kernel level").
+mword Scheduler::schedMinGranularityTicks = 4000000;
+mword Scheduler::defaultEpochLengthTicks = 20000000;
+mword Scheduler::currentEpochLengthTicks = 20000000;
 	   
 /***********************************
     Used as a node in the tree to 
@@ -74,6 +88,12 @@ Scheduler::Scheduler() : readyCount(0), preemption(0), resumption(0), partner(th
 	//Add the idle thread to the tree
 	readyTree->insert(*(new ThreadNode(idleThread)));
 	readyCount += 1;
+
+	// Updating the value of the current time slice.
+	// The denominator (the readyCount) encapsulates
+	// the total priority values of all the tasks
+	// currently in the readyTree.
+	taskTimeslice = currentEpochLengthTicks/readyCount;
 }
 
 /***********************************
@@ -92,11 +112,24 @@ static inline void unlock(BasicLock &l, Args&... a) {
 	should be added to the tree
 ***********************************/
 void Scheduler::enqueue(Thread& t) {
+  // Before adding a thread to the tree,
+  // the total running priority should be
+  // updated in anticipation of a tick
+  // recalculation.
   GENASSERT1(t.priority < maxPriority, t.priority);
   readyLock.acquire();
   readyTree->insert(*(new ThreadNode(&t)));	
   bool wake = (readyCount == 0);
-  readyCount += 1;						
+  readyCount += 1;	 
+
+  // Adjusting epochLengthTicks according to the provisions
+  // in the assignment guidelines. 
+  if (defaultEpochLengthTicks >= (readyCount * schedMinGranularityTicks)) {
+
+  } else {
+		currentEpochLengthTicks = (readyCount + 1)*schedMinGranularityTicks;
+  }
+					
   readyLock.release();
   Runtime::debugS("Thread ", FmtHex(&t), " queued on ", FmtHex(this));
   if (wake) Runtime::wakeUp(this);

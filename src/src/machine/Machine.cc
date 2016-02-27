@@ -41,6 +41,7 @@
 #include <list>
 #include <map>
 
+mword Machine::cycles;
 
 // simple direct declarations in lieu of more header files
 extern void initCdiDrivers();
@@ -371,6 +372,16 @@ apDone:
   }
   StdOut.print(kendl);
 
+    mword start = CPU::readTSC();
+    Clock::wait(1000);
+    mword end = CPU::readTSC();
+
+    Machine::cycles = end - start;
+
+	// Calculating a form factor for converting
+	// machine time into "ticks".
+    Machine::cycles = (Machine::cycles)/1000;
+
   DBG::outl(DBG::Boot, "Building kernel filesystem...");
   // initialize kernel file system with boot modules
   Multiboot::readModules(kernelBase);
@@ -392,6 +403,7 @@ apDone:
   lwip_init_tcpip();
 
   DBG::outl(DBG::Boot, "Starting CDI devices...");
+
   // find and install CDI drivers for PCI devices - need interrupts for sleep
   for (const PCIDevice& pd : pciDevList) findCdiDriver(pd);
 

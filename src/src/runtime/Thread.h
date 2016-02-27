@@ -44,6 +44,11 @@ class Thread : public EmbeddedList<Thread>::Link {
   Thread(const Thread&) = delete;
   const Thread& operator=(const Thread&) = delete;
 
+
+  // Runtime variables for recalibrating threads in terms of ticks
+  mword timeStart;
+  mword timeWait = 0;
+
 protected:
   enum State { Running, Blocked, Cancelled, Finishing } state;
   UnblockInfo* unblockInfo; // unblock vs. timeout vs. cancel

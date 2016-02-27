@@ -26,6 +26,8 @@ class Machine : public NoObject {
   friend void initGdb(mword); // initGdb calls setupIDT to redirect exception handlers
 
   static mword processorCount;
+public:
+  static mword cycles;
 
   static void setupIDT(uint32_t, paddr, uint32_t = 0)  __section(".boot.text");
   static void setupIDTable()                           __section(".boot.text");
