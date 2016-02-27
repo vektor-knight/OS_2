@@ -133,7 +133,12 @@ void Scheduler::enqueue(Thread& t) {
   } else {
 		currentEpochLengthTicks = (readyCount + 1)*schedMinGranularityTicks;
   }
-					
+
+  if (!t.threadAwake) {
+	t.vRuntime += MIN_RUNTIME;
+    t.threadAwake = true;
+  }
+			
   readyLock.release();
   Runtime::debugS("Thread ", FmtHex(&t), " queued on ", FmtHex(this));
   if (wake) Runtime::wakeUp(this);
@@ -218,8 +223,16 @@ inline void Scheduler::switchThread(Scheduler* target, Args&... a) {
   readyLock.acquire();
 	
   if(!readyTree->empty()){
-	  nextThread = readyTree->popMinNode()->th;	
-      readyCount -= 1;
+	  nextThread = readyTree->popMinNode()->th;
+	  nextThread->endThread = CPU::readTSC();
+	  nextThread->startThread = nextThread->endThread;
+
+	  taskTimeslice = (currentEpochLengthTicks*nextThread->priority+1)/(totalPrio+1);
+      
+	  nextThread->timeWait = nextThread->timeWait + CPU::readTSC() - nextThread->timeStart;
+
+	MIN_RUNTIME = nextThread->vRuntime;
+   	  readyCount -= 1;
  	  goto threadFound;
 	}
 
