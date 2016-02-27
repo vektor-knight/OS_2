@@ -19,8 +19,15 @@
 #include "devices/RTC.h"
 #include "kernel/Output.h"
 
-void RTC::init() { // see http://wiki.osdev.org/RTC
+void RTC::init() { 
+  // see http://wiki.osdev.org/RTC
   // done. use the documentation to support claims here.
+/*
+Changing the interrupt rate without interfering with the RTC
+Setting must be a value from 1 - 15, with 3
+being the fastes rate we can select
+Set rate to a variable. Error check if it's greater than 15
+*/
   mword RTC_rate = PIC::RTC;
   if (RTC_rate>15) RTC_rate = 15;
 

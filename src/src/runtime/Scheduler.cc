@@ -29,6 +29,11 @@
 mword MIN_RUNTIME = 0xFFFFFFFF;
 // Needed for recalibrating scheduler parameters
 // in terms of ticks per second.
+/*
+Task is selected to be dispatched, time slice is calculated in
+TSC ticks by the formula given to us in the Assignemnt sheet
+
+*/
 mword totalPrio = 0;
 mword taskTimeslice = 1;
 // Task running times
@@ -39,6 +44,11 @@ mword timeWait;
 // schedparams, the default values
 // for granularity and epoch length
 // are defined here.
+/*
+Minimum granularity is the minimum time the task must be run
+before it is preempted.
+Epoch Length is the defualth length of an epoch
+*/
 int schedMinGranularity = 20;
 int defaultEpochLength = 4;
 
@@ -87,8 +97,21 @@ Scheduler::Scheduler() : readyCount(0), preemption(0), resumption(0), partner(th
 	idleThread->stackPointer = stackInit(idleThread->stackPointer, &Runtime::getDefaultMemoryContext(), (ptr_t)Runtime::idleLoop, this, nullptr, nullptr);
 	
 	//Initialize the tree that contains the threads waiting to be served
+/*
+WHen the task is added to readyTree the epoch length
+is adjusted. Formula given to us.
+Update virtual runtime to equal
+minimum virtual runtime, and a new task is 
+being run immediately
+
+*/
 	readyTree = new Tree<ThreadNode>();
-	
+	/*
+	The scheduler keeps track of the running time of each task
+	Schedyler updates the virtual runtime of the current task
+
+
+*/
 	//Add the idle thread to the tree
 	readyTree->insert(*(new ThreadNode(idleThread)));
 	readyCount += 1;

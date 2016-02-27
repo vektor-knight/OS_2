@@ -46,6 +46,11 @@ class Thread : public EmbeddedList<Thread>::Link {
 
 
   // Runtime variables for recalibrating threads in terms of ticks
+  /*
+DEfault values that are converted from millisecons to TSC ticks. This
+is because the kernel keeps track of time in TSC ticks
+
+*/
   mword timeStart;
   mword timeWait = 0;
   mword endThread = 0;

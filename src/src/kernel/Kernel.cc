@@ -43,6 +43,12 @@ string minGranularity;
 
 void kosMain() {  
 
+/*
+reading sched param file for values
+according to Granularity and Epoch Length
+*/
+
+
   KOUT::outl("Welcome to KOS!", kendl);
   auto iter = kernelFS.find("schedparam");
   if (iter == kernelFS.end()) {
