@@ -23,6 +23,10 @@
 #include "machine/Machine.h"
 #include "devices/Keyboard.h"
 
+// Initialize minimum run-time to maximum long integer value
+// as a constant. It will be updated to the current virtual
+// run-time as we check the thread test-cases in switchTest().
+mword MIN_RUNTIME = 0xFFFFFFFF;
 // Needed for recalibrating scheduler parameters
 // in terms of ticks per second.
 mword totalPrio = 0;
@@ -167,10 +171,38 @@ void Scheduler::preempt(){		// IRQs disabled, lock count inflated
 	one
 ***********************************/
 bool Scheduler::switchTest(Thread* t){
+	mword totalRun = (t->endThread) - (t->startThread);
+
+	// After performing the provided calculation
+	// for updating the virtual run-time to the current
+	// time point, we must check the conditions for 
+	// whether the thread should be switched or not.
+	// This will be contingent on the boolean values
+	// of the total run-time against the min. granularity
+	// ticks of the scheduler and the time slice of the process
+	// that is running.
+
+    t->vRuntime+=totalRun/(( (t->priority)%1) + 1);
+	if (t->vRuntime < MIN_RUNTIME) {
+		MIN_RUNTIME = t->vRuntime;
+		return false;
+	}
+
+	if (totalRun >= taskTimeslice) {
+		return true;
+	}
+
+	if (totalRun >= Scheduler::schedMinGranularityTicks) {
+		return true;
+	} 
+
+	return false;
+	
 	t->vRuntime++;
 	if (t->vRuntime % 10 == 0)
 		return true;
-	return false;															//Otherwise return that the thread should not be switched
+	return false; 
+//Otherwise return that the thread should not be switched
 }
 
 /***********************************

@@ -48,6 +48,10 @@ class Thread : public EmbeddedList<Thread>::Link {
   // Runtime variables for recalibrating threads in terms of ticks
   mword timeStart;
   mword timeWait = 0;
+  mword endThread = 0;
+  mword startThread = 0;
+  bool threadAwake = true;
+  bool threadRunning = false;
 
 protected:
   enum State { Running, Blocked, Cancelled, Finishing } state;
